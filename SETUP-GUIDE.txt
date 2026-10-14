@@ -1,0 +1,88 @@
+STK MINECRAFT STORE — GITHUB PAGES + SUPABASE
+================================================
+This is a complete starter project for a static GitHub Pages website and a shared Supabase database/API. It is NOT live until you complete the setup below. It does not process real payments.
+
+FILES
+- index.html, style.css, app.js: full multi-page-style website (sections share one page URL with #anchors)
+- config.js: public Supabase URL + anon/publishable key only
+- supabase/schema.sql: database tables and permissions
+- supabase/functions/stk-api/index.ts: API for order creation, admin login, admin activation/revocation, and server redemption
+- images/: put stksmplogo.png and websiteheader.png here
+
+PART A — MAKE THE GITHUB WEBSITE
+1. Sign in at https://github.com/.
+2. Click the + menu > New repository.
+3. Name it `stk-minecraft-store`. Choose Public (GitHub Pages is simplest with a public repository), then Create repository.
+4. On the repository page, click Add file > Upload files.
+5. Upload index.html, style.css, app.js, config.js, and the images folder contents. Also upload the `supabase` folder and this guide if you want to keep setup files in the repository. Commit changes.
+6. Open repository Settings > Pages.
+7. Under Build and deployment, choose Deploy from a branch.
+8. Choose branch `main` and folder `/ (root)`, then Save.
+9. Wait a minute, refresh the Pages section, and open the URL GitHub shows you. It typically looks like `https://YOUR-USERNAME.github.io/stk-minecraft-store/`.
+10. At first, key requests will say the backend isn't configured. That is expected until Part B.
+
+PART B — CREATE THE SHARED DATABASE/API IN SUPABASE
+1. Open https://supabase.com/ and create/sign into an account.
+2. Create a new project named `stk-minecraft-store`. Save the database password somewhere private.
+3. Wait until the project finishes provisioning.
+4. In Supabase, open SQL Editor > New query. Open `supabase/schema.sql` from this project, copy all of it into the SQL Editor, and click Run.
+5. Open Project Settings > API Keys. Copy the Project URL and the publishable/anon key (not service_role).
+6. Edit `config.js` in GitHub. Replace:
+   PASTE_YOUR_SUPABASE_PROJECT_URL_HERE
+   PASTE_YOUR_SUPABASE_ANON_KEY_HERE
+   with the actual Project URL and anon/publishable key. Commit changes.
+7. Install the Supabase CLI on your own computer, or use the Supabase Dashboard's Edge Functions editor if available. The CLI method is described below.
+8. In the Supabase project, open Edge Functions and create a function named `stk-api`, then deploy the contents of `supabase/functions/stk-api/index.ts`.
+9. Set function secrets/environment variables `STK_ADMIN_PASSWORD` and `STK_SERVER_SECRET` to long random values. Do not put either secret in config.js or GitHub. Supabase automatically provides SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY to Edge Functions.
+10. Deploy the function and ensure the URL is `https://YOUR_PROJECT_REF.supabase.co/functions/v1/stk-api`.
+11. In Supabase Edge Function settings, confirm JWT verification behavior matches this function: it accepts the public anon key for the public endpoint, then performs its own admin/server secret checks for privileged actions. If Supabase requires JWT verification by default, either configure invocation to accept the anon key as the gateway bearer token or disable gateway JWT verification for this function and rely on the function's action-level checks. Do not make database tables publicly accessible.
+12. Return to the GitHub Pages site, refresh, submit a test request with a Minecraft username, and confirm it appears in Supabase Table Editor > stk_keys.
+13. Open Admin in the website and use the `STK_ADMIN_PASSWORD` value you set as a function secret. Activate the test key. Confirm its status changes in the table.
+
+DEPLOYING THE EDGE FUNCTION WITH SUPABASE CLI (ONE OPTION)
+1. Install Node.js LTS from https://nodejs.org/ if you do not already have it.
+2. Install the Supabase CLI using the official instructions: https://supabase.com/docs/guides/cli
+3. Open a terminal in this project folder.
+4. Run `supabase login`.
+5. Run `supabase link --project-ref YOUR_PROJECT_REF` (find project ref in Supabase project URL).
+6. Set secrets (replace examples with your own values; don't commit these):
+   `supabase secrets set STK_ADMIN_PASSWORD="choose-a-long-unique-password" STK_SERVER_SECRET="choose-a-different-long-random-secret"`
+7. Deploy:
+   `supabase functions deploy stk-api --no-verify-jwt`
+   This deployment flag makes the function callable with the public anon key; the function itself must validate admin/server secrets. Do not remove those checks.
+8. Keep your service-role key private. Never put it in GitHub or config.js.
+
+PART C — CHANGE THE ADMIN PASSWORD
+- The password is the `STK_ADMIN_PASSWORD` secret set in Supabase, not a password inside the HTML.
+- Use a long unique password and don't share it. If you forget it, set a new secret and redeploy/restart the function if required by Supabase.
+
+PART D — MINECRAFT SERVER CONNECTION — NOT YET COMPLETED ON REGULAR SKRIPT ALONE
+The API supports `server_redeem` with a private `STK_SERVER_SECRET`, but regular Skript alone generally cannot make arbitrary HTTP requests. The server must have a compatible HTTP addon/bridge and a Skript integration that calls this endpoint. Your Aternos server currently only has Skript, so do not claim in-game redemption is live yet.
+- Request body to POST to `/functions/v1/stk-api`:
+  {"action":"server_redeem","server_secret":"YOUR_PRIVATE_STK_SERVER_SECRET","key":"STK-XXXX-XXXX-XXXX-XXXX","username":"MinecraftName"}
+- Also send `Content-Type: application/json`.
+- Parse the JSON response. Only grant the returned product/quantity if `ok` is true. The endpoint marks the key redeemed before returning success.
+- Do not put the server secret in the public GitHub repository, HTML, or config.js.
+- A compatible HTTP addon/bridge is still required, and the reward commands need to be matched to your installed rank/crate plugins. This package does not include a fake Skript command that pretends remote redemption works.
+
+PART E — TEST CHECKLIST
+[ ] GitHub Pages opens
+[ ] Supabase schema runs successfully
+[ ] Supabase function is deployed
+[ ] config.js has project URL and anon key (never service_role)
+[ ] Store request creates a row in stk_keys
+[ ] Admin password login works
+[ ] Admin can activate/revoke a pending/active key
+[ ] server_redeem endpoint is tested with a private request before connecting Minecraft
+[ ] Compatible HTTP addon/bridge installed on Aternos
+[ ] Rewards configured for VIP, battlepass, and each crate tier
+[ ] End-to-end test with a throwaway key succeeds before public launch
+
+PRICES INCLUDED
+VIP $5 (editable in code), Battlepass $5
+Common: 1/$1, 5/$4, 10/$7
+Uncommon: 1/$2, 5/$8, 10/$15
+Rare: 1/$4, 5/$16, 10/$30
+Legendary: 1/$6, 5/$24, 10/$45
+Godly: 1/$10, 5/$40, 10/$75
+No real payment processing is present.
